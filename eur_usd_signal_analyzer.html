@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EUR/USD Signal Analyzer</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121d30;--muted:#91a2bb;--line:#263650;--green:#20c997;--red:#ff6577;--amber:#f4bd50;--blue:#69a7ff}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#08101d,#101d31);font:15px system-ui,-apple-system,Segoe UI,sans-serif;color:#edf3ff}
+main{max-width:900px;margin:auto;padding:22px 16px 40px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:clamp(24px,5vw,34px);margin:0}.sub{color:var(--muted);margin:6px 0 20px}.pill{border:1px solid var(--line);border-radius:999px;padding:7px 11px;color:var(--muted);font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.card{background:rgba(18,29,48,.96);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:13px}
+.price{font-size:32px;font-weight:750;letter-spacing:.4px}.muted{color:var(--muted)}.small{font-size:12px;color:var(--muted)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.controls button,select{background:#1a2a43;border:1px solid #344966;color:#eaf1ff;border-radius:10px;padding:11px 14px;font:inherit}
+button.primary{background:#2468c9;border-color:#3985ef;font-weight:700;flex:1;min-width:180px}button:disabled{opacity:.5}
+select{min-width:120px}.signal{font-size:32px;font-weight:800;margin:4px 0}.up{color:var(--green)}.down{color:var(--red)}.wait{color:var(--amber)}
+.metric{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}.metric:last-child{border:0}
+.track{height:9px;border-radius:99px;background:#263650;overflow:hidden;margin:10px 0}.fill{height:100%;width:0;background:var(--green);transition:width .25s}
+.indicators{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.ind{background:#0d1728;border:1px solid var(--line);border-radius:10px;padding:11px}.ind b{display:block;margin-top:5px}
+.note{font-size:12px;line-height:1.5;color:var(--muted)}.status{display:flex;align-items:center;gap:8px}.dot{width:8px;height:8px;border-radius:50%;background:var(--amber)}.dot.ok{background:var(--green)}.dot.bad{background:var(--red)}
+@media(max-width:560px){.grid,.indicators{grid-template-columns:1fr}.price{font-size:27px}}
+</style>
+</head>
+<body><main>
+<div class="top"><div><h1>EUR/USD Signal Analyzer</h1><div class="sub">Technical indicator consensus · 1–5 minute expiry guide</div></div><span class="pill">DEMO / SIGNALS ONLY</span></div>
+<div class="grid">
+ <section class="card"><div class="small">EUR/USD LIVE QUOTE</div><div class="price" id="price">—</div><div class="status small"><span class="dot" id="dot"></span><span id="connection">Connecting to Deriv market data…</span></div><div class="small" id="updated">Waiting for first tick</div></section>
+ <section class="card"><div class="small">TICK HISTORY</div><div class="price" id="tickCount">0</div><div class="small">Ticks received · builds 1-minute candles</div><div class="small" id="candleCount">0 completed candles</div></section>
+</div>
+<section class="card">
+ <b>Signal settings</b>
+ <div class="controls"><label class="small">Expiry<br><select id="expiry"><option value="1">1 minute</option><option value="2">2 minutes</option><option value="3">3 minutes</option><option value="4">4 minutes</option><option value="5">5 minutes</option></select></label>
+ <label class="small">Minimum agreement<br><select id="threshold"><option value="5">5 of 7 indicators</option><option value="6" selected>6 of 7 indicators</option><option value="7">7 of 7 indicators</option></select></label>
+ <button class="primary" id="analyze">ANALYZE EUR/USD</button></div>
+ <div class="small">The selected expiry is a proposed contract duration, not a guaranteed prediction horizon.</div>
+</section>
+<section class="card">
+ <div class="small">LATEST ANALYSIS</div><div class="signal wait" id="direction">WAIT</div>
+ <div id="summary" class="muted">Collecting market data. Analysis becomes available after enough candles have formed.</div>
+ <div class="track"><div class="fill" id="bullBar"></div></div>
+ <div class="metric"><span>Bullish votes</span><b id="bullVotes">—</b></div>
+ <div class="metric"><span>Bearish votes</span><b id="bearVotes">—</b></div>
+ <div class="metric"><span>Agreement</span><b id="agreement">—</b></div>
+ <div class="metric"><span>ATR / volatility filter</span><b id="atrState">—</b></div>
+</section>
+<section class="card"><b>Indicator readings</b><div class="indicators" id="indicators" style="margin-top:12px">
+ <div class="ind">Bollinger Bands<b>Waiting</b></div><div class="ind">Supertrend<b>Waiting</b></div>
+ <div class="ind">EMA / SMA<b>Waiting</b></div><div class="ind">RSI<b>Waiting</b></div>
+ <div class="ind">Stochastic<b>Waiting</b></div><div class="ind">MACD<b>Waiting</b></div>
+ <div class="ind">ATR<b>Waiting</b></div></div></section>
+<section class="card"><b>How this bot decides</b><p class="note">It builds one-minute candles from Deriv EUR/USD ticks, then scores Bollinger Bands, Supertrend, EMA/SMA, RSI, Stochastic and MACD as bullish or bearish votes. ATR is a volatility/suitability filter, not a direction vote. It returns UP or DOWN only when the chosen vote threshold is met and volatility is not unusually low or high; otherwise it returns WAIT.</p><p class="note">Important: This is an experimental technical-analysis tool, not a validated profitable strategy. Short-expiry binary options are extremely risky. Indicator agreement and the displayed score are not calibrated win probabilities. Test on demo, include payout/breakeven math, and never risk money you cannot afford to lose.</p></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const state={ticks:[],candles:[],socket:null,req:1,connected:false,lastPrice:null};
+const SYMBOL='frxEURUSD';
+function setStatus(msg,kind=''){ $('connection').textContent=msg;$('dot').className='dot '+kind; }
+function connect(){
+ try{
+  const ws=new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');state.socket=ws;
+  ws.onopen=()=>{setStatus('Connected · subscribing to EUR/USD','ok');ws.send(JSON.stringify({ticks:SYMBOL,subscribe:1}));};
+  ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.error){setStatus('Feed error: '+m.error.message,'bad');return;}if(m.msg_type==='tick'){const t=m.tick;state.lastPrice=t.quote;state.ticks.push({p:t.quote,ts:t.epoch});if(state.ticks.length>30000)state.ticks.shift();$('price').textContent=Number(t.quote).toFixed(5);$('tickCount').textContent=state.ticks.length.toLocaleString();$('updated').textContent='Last tick: '+new Date(t.epoch*1000).toLocaleTimeString();buildCandles();}};
+  ws.onerror=()=>setStatus('Connection error · check network or reconnect','bad');
+  ws.onclose=()=>{setStatus('Disconnected · reconnecting in 5 seconds','bad');setTimeout(connect,5000);};
+ }catch(e){setStatus('Could not start market feed','bad');}
+}
+function buildCandles(){
+ const map=new Map();for(const t of state.ticks){const k=Math.floor(t.ts/60)*60;let c=map.get(k);if(!c){c={time:k,o:t.p,h:t.p,l:t.p,c:t.p};map.set(k,c);}c.h=Math.max(c.h,t.p);c.l=Math.min(c.l,t.p);c.c=t.p;}
+ state.candles=[...map.values()].sort((a,b)=>a.time-b.time);$('candleCount').textContent=state.candles.length+' minute buckets';
+}
+const avg=a=>a.reduce((s,x)=>s+x,0)/a.length;
+function ema(a,n){if(a.length<n)return null;let v=avg(a.slice(0,n)),k=2/(n+1);for(let i=n;i<a.length;i++)v=a[i]*k+v*(1-k);return v;}
+function sma(a,n){return a.length<n?null:avg(a.slice(-n));}
+function rsi(a,n=14){if(a.length<=n)return null;let g=0,l=0;for(let i=a.length-n;i<a.length;i++){let d=a[i]-a[i-1];if(d>0)g+=d;else l-=d;}if(l===0)return 100;return 100-100/(1+(g/n)/(l/n));}
+function atr(cs,n=14){if(cs.length<=n)return null;let trs=[];for(let i=1;i<cs.length;i++){let c=cs[i],p=cs[i-1];trs.push(Math.max(c.h-c.l,Math.abs(c.h-p.c),Math.abs(c.l-p.c)));}return avg(trs.slice(-n));}
+function std(a){let m=avg(a);return Math.sqrt(avg(a.map(x=>(x-m)**2)));}
+function calc(){
+ const cs=state.candles;if(cs.length<35)return null;const closes=cs.map(c=>c.c),last=closes.at(-1),votes=[];
+ const bb=closes.slice(-20),mid=avg(bb),sd=std(bb),upper=mid+2*sd,lower=mid-2*sd;
+ let bbv=last>mid?1:-1;if(last>upper)bbv=-1;if(last<lower)bbv=1;votes.push(bbv);
+ // Supertrend direction via ATR(10), multiplier 3, iterative final bands
+ let tr=[];for(let i=1;i<cs.length;i++){let c=cs[i],p=cs[i-1];tr.push(Math.max(c.h-c.l,Math.abs(c.h-p.c),Math.abs(c.l-p.c)));}
+ let stDir=1,ub=0,lb=0;for(let i=10;i<cs.length;i++){let av=avg(tr.slice(i-10,i)),midhl=(cs[i].h+cs[i].l)/2,bu=midhl+3*av,bl=midhl-3*av;if(i===10){ub=bu;lb=bl;}else{ub=bu<ub||cs[i-1].c>ub?bu:ub;lb=bl>lb||cs[i-1].c<lb?bl:lb;}if(stDir===1&&cs[i].c<lb)stDir=-1;else if(stDir===-1&&cs[i].c>ub)stDir=1;}votes.push(stDir);
+ const e9=ema(closes,9),e21=ema(closes,21),s20=sma(closes,20);let trend=(e9>e21&&last>s20)?1:(e9<e21&&last<s20)?-1:0;votes.push(trend);
+ const rv=rsi(closes);let rsv=rv>55?1:rv<45?-1:0;votes.push(rsv);
+ // stochastic %K and %D from last 14 candle highs/lows
+ const recent=cs.slice(-14),hi=Math.max(...recent.map(c=>c.h)),lo=Math.min(...recent.map(c=>c.l)),k=hi===lo?50:(last-lo)/(hi-lo)*100;
+ const kPrev=cs.slice(-15,-1),ph=Math.max(...kPrev.map(c=>c.h)),pl=Math.min(...kPrev.map(c=>c.l)),pk=ph===pl?50:(cs.at(-2).c-pl)/(ph-pl)*100;
+ let sto=k>pk&&k<80?1:k<pk&&k>20?-1:0;votes.push(sto);
+ const mline=ema(closes,12)-ema(closes,26),sig=(()=>{let vals=[];for(let i=25;i<closes.length;i++)vals.push(ema(closes.slice(0,i+1),12)-ema(closes.slice(0,i+1),26));return ema(vals,9);})();
+ let mac=mline>sig?1:-1;votes.push(mac);
+ const av=atr(cs);const ranges=cs.slice(-20).map(c=>c.h-c.l),typ=avg(ranges);let vol='Normal';if(av<typ*.45)vol='Low';if(av>typ*2.8)vol='High';
+ const bull=votes.filter(x=>x===1).length,bear=votes.filter(x=>x===-1).length,neutral=votes.filter(x=>x===0).length;
+ return {last,bbv,stDir,trend,rv,rsv,k,sto,mline,sig,mac,av,vol,bull,bear,neutral,votes};
+}
+function label(v){return v>0?'BULLISH':v<0?'BEARISH':'NEUTRAL';}
+function render(){
+ const x=calc();if(!x){$('direction').textContent='WAIT';$('summary').textContent='Need at least 35 completed one-minute candles. Keep the page connected while it collects data.';return;}
+ const threshold=Number($('threshold').value);let dir='WAIT',cls='wait';
+ if(x.vol==='Normal'&&x.bull>=threshold){dir='UP';cls='up';}else if(x.vol==='Normal'&&x.bear>=threshold){dir='DOWN';cls='down';}
+ $('direction').textContent=dir;$('direction').className='signal '+cls;
+ $('summary').textContent=dir==='WAIT'?'No trade: indicator agreement or volatility filter is not strong enough.':`Consensus leans ${dir}. Proposed expiry: ${$('expiry').value} minute(s).`;
+ $('bullVotes').textContent=x.bull+' / 6';$('bearVotes').textContent=x.bear+' / 6';$('agreement').textContent=Math.max(x.bull,x.bear)+' of 6 directional votes';$('bullBar').style.width=(x.bull/6*100)+'%';$('atrState').textContent=x.vol+' · '+x.av.toFixed(6);
+ const items=[['Bollinger Bands',label(x.bbv)],['Supertrend',label(x.stDir)],['EMA / SMA',label(x.trend)],['RSI',x.rv.toFixed(1)+' · '+label(x.rsv)],['Stochastic',x.k.toFixed(1)+' · '+label(x.sto)],['MACD',label(x.mac)],['ATR',x.vol+' · '+x.av.toFixed(6)]];
+ $('indicators').innerHTML=items.map(([a,b])=>`<div class="ind">${a}<b>${b}</b></div>`).join('');
+}
+$('analyze').addEventListener('click',render);$('expiry').addEventListener('change',()=>{});connect();
+</script></body></html>
